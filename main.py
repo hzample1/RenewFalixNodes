@@ -333,9 +333,24 @@ def handle_ad_modal(sb, server_id: str) -> bool:
 
 # ---------- 获取控制台页面的服务器状态 ----------
 def get_console_status(sb) -> str:
+    # 优先从父级 #csb-status 的 class 判断（csb-online / csb-offline），
+    # 不依赖动态 id(fx-...) 且自动规避中英文差异，统一返回英文状态。
     try:
-        elem = sb.find_element("#csb-status span:last-child", timeout=5)
-        return elem.text.strip().lower()
+        elem = sb.find_element("#csb-status", timeout=5)
+        cls = (elem.get_attribute("class") or "").lower()
+        if "online" in cls:
+            return "online"
+        if "offline" in cls:
+            return "offline"
+        # 兜底：从文本读取（兼容 中文“在线/离线” 或 英文 “online/offline”）
+        text = elem.text.strip().lower()
+        if not text:
+            return "unknown"
+        if "offline" in text or text == "离线":
+            return "offline"
+        if "online" in text or text == "在线":
+            return "online"
+        return text
     except Exception:
         return "unknown"
 
@@ -415,32 +430,29 @@ def check_and_restart_server(
         status = get_console_status(sb)
         print(f"[INFO] {server_name}  状态=[{status}]  尝试={attempt+1}")
 
-        if not is_offline(status):
-            last_shot = shot(sb, f"online-{sid_short}")
-            return True, f"在线 ({status})", last_shot
+        # 根据状态决定动作：在线 → 点“重启”；离线 → 点“启动”
+        if status == "online":
+            action, action_en, btn_selector = "重启", "restart", ".console-btn.restart"
+        else:
+            action, action_en, btn_selector = "启动", "start", ".console-btn.start"
 
-        # 点击 Start
+        # 点击对应按钮（id 是动态的，一律用稳定的 class 定位）
         try:
-            # sb.click("#startbutton", timeout=5)
-            # print(f"[INFO] 已点击 Start（{attempt+1}/{AD_RETRY_LIMIT}）")
-            # time.sleep(5)
-            # last_shot = shot(sb, f"after-start-{sid_short}-a{attempt+1}")
-            sb.click(".console-btn.start", timeout=5)   # 或 "button.console-btn.start"
-            print(f"[INFO] 已点击 Start（{attempt+1}/{AD_RETRY_LIMIT}）")
+            sb.click(btn_selector, timeout=5)
+            print(f"[INFO] 状态[{status}] → 点击「{action}」（{attempt+1}/{AD_RETRY_LIMIT}）")
             time.sleep(5)
-            last_shot = shot(sb, f"after-start-{sid_short}-a{attempt+1}")
-
+            last_shot = shot(sb, f"after-{action_en}-{sid_short}-a{attempt+1}")
         except Exception as e:
-            print(f"[WARN] 点击 Start 失败: {e}")
+            print(f"[WARN] 点击「{action}」失败: {e}")
 
         if handle_ad_modal(sb, server_id):
             continue
 
         new_status = get_console_status(sb)
-        print(f"[INFO] {server_name}  启动后状态=[{new_status}]")
+        print(f"[INFO] {server_name} {action}后状态=[{new_status}]")
         if not is_offline(new_status):
-            last_shot = shot(sb, f"restarted-{sid_short}")
-            return True, f"重启成功 ({new_status})", last_shot
+            last_shot = shot(sb, f"done-{sid_short}")
+            return True, f"{action}成功 ({new_status})", last_shot
 
         time.sleep(3)
 
@@ -581,7 +593,7 @@ def login_and_restart(email: str, password: str, proxy: Optional[str]) -> Dict:
                 "status": desc,
             })
             result["screenshots"].append(svr_shot)
-            if "重启成功" in desc:
+            if "重启成功" in desc or "启动成功" in desc:
                 restarted += 1
 
         result["success"] = True
