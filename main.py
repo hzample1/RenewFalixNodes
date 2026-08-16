@@ -334,7 +334,7 @@ def handle_ad_modal(sb, server_id: str) -> bool:
 # ---------- 获取控制台页面的服务器状态 ----------
 def get_console_status(sb) -> str:
     try:
-        elem = sb.find_element("#csb-status-text", timeout=5)
+        elem = sb.find_element("#csb-status span:last-child", timeout=5)
         return elem.text.strip().lower()
     except Exception:
         return "unknown"
@@ -421,10 +421,15 @@ def check_and_restart_server(
 
         # 点击 Start
         try:
-            sb.click("#startbutton", timeout=5)
+            # sb.click("#startbutton", timeout=5)
+            # print(f"[INFO] 已点击 Start（{attempt+1}/{AD_RETRY_LIMIT}）")
+            # time.sleep(5)
+            # last_shot = shot(sb, f"after-start-{sid_short}-a{attempt+1}")
+            sb.click(".console-btn.start", timeout=5)   # 或 "button.console-btn.start"
             print(f"[INFO] 已点击 Start（{attempt+1}/{AD_RETRY_LIMIT}）")
             time.sleep(5)
             last_shot = shot(sb, f"after-start-{sid_short}-a{attempt+1}")
+
         except Exception as e:
             print(f"[WARN] 点击 Start 失败: {e}")
 
