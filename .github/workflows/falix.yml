@@ -32,37 +32,43 @@ jobs:
           sudo apt-get install -y ffmpeg
           pip install -q seleniumbase requests pyvirtualdisplay
 
-      - name: 配置代理
-        env:
-          HY2_URL: ${{ secrets.HY2_URL }}
-        run: |
-          if [ -z "$HY2_URL" ]; then
-            echo "[INFO] 无代理配置，使用直连模式"
-            exit 0
-          fi
+      # - name: 配置代理
+      #   env:
+      #     HY2_URL: ${{ secrets.HY2_URL }}
+      #   run: |
+      #     if [ -z "$HY2_URL" ]; then
+      #       echo "[INFO] 无代理配置，使用直连模式"
+      #       exit 0
+      #     fi
           
-          echo "[INFO] 配置 Hysteria2 代理"
-          wget -q https://github.com/apernet/hysteria/releases/latest/download/hysteria-linux-amd64 -O hysteria
-          chmod +x hysteria
+      #     echo "[INFO] 配置 Hysteria2 代理"
+      #     wget -q https://github.com/apernet/hysteria/releases/latest/download/hysteria-linux-amd64 -O hysteria
+      #     chmod +x hysteria
           
-          URL="${HY2_URL#hysteria2://}"
-          PASSWORD="${URL%%@*}"
-          SERVER="${URL#*@}"; SERVER="${SERVER%%\?*}"
-          SNI=$(echo "$URL" | grep -oP 'sni=\K[^&]+' || echo "${SERVER%%:*}")
+      #     URL="${HY2_URL#hysteria2://}"
+      #     PASSWORD="${URL%%@*}"
+      #     SERVER="${URL#*@}"; SERVER="${SERVER%%\?*}"
+      #     SNI=$(echo "$URL" | grep -oP 'sni=\K[^&]+' || echo "${SERVER%%:*}")
           
-          cat > hy2.yaml << EOF
-          server: ${SERVER}
-          auth: ${PASSWORD}
-          tls:
-            sni: ${SNI}
-            insecure: true
-          http:
-            listen: 127.0.0.1:1080
-          EOF
+      #     cat > hy2.yaml << EOF
+      #     server: ${SERVER}
+      #     auth: ${PASSWORD}
+      #     tls:
+      #       sni: ${SNI}
+      #       insecure: true
+      #     http:
+      #       listen: 127.0.0.1:1080
+      #     EOF
           
-          ./hysteria client -c hy2.yaml > /dev/null 2>&1 &
-          sleep 3
-          echo "[INFO] 代理已启动"
+      #     ./hysteria client -c hy2.yaml > /dev/null 2>&1 &
+      #     sleep 3
+      #     echo "[INFO] 代理已启动"
+
+      - name: 启用 WARP 网络
+        uses: fscarmen/warp-on-actions@v1.3
+        with:
+          stack: dual
+          mode: client
 
       - name: 执行重启脚本
         env:
