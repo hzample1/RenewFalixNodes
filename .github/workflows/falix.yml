@@ -7,7 +7,7 @@ on:
         description: '指定邮箱（留空全部，多个用逗号）'
         required: false
   schedule:
-   - cron: '0 */6 * * *'  # 每 6 小时执行一次
+   - cron: '0 */4 * * *'  # 每 6 小时执行一次
 
 jobs:
   restart:
