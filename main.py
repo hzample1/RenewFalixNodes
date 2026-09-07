@@ -507,9 +507,10 @@ def login_and_restart(email: str, password: str, proxy: Optional[str]) -> Dict:
 
             # 填写表单
             try:
-                sb.wait_for_element_visible("#email-address", timeout=10)
-                sb.execute_script("document.querySelector('#email-address').value = '';")
-                sb.type("#email-address", email)
+                sb.wait_for_element_visible("#email, #email-address", timeout=10)
+                email_selector = "#email" if sb.is_element_present("#email") else "#email-address"
+                sb.execute_script(f"document.querySelector('{email_selector}').value = '';")
+                sb.type(email_selector, email)
                 sb.execute_script("document.querySelector('#password').value = '';")
                 sb.type("#password", password)
                 print("[INFO] 表单填写完毕")
@@ -529,7 +530,13 @@ def login_and_restart(email: str, password: str, proxy: Optional[str]) -> Dict:
 
             # 提交
             try:
-                sb.click("button[name='submit']", timeout=5)
+                for sel in (".auth-submit-btn", "button[name='submit']", "button[type='submit']"):
+                    if sb.is_element_present(sel):
+                        submit_selector = sel
+                        break
+                else:
+                    submit_selector = ".auth-submit-btn"
+                sb.click(submit_selector, timeout=5)
                 print("[INFO] 表单已提交")
             except Exception as e:
                 print(f"[ERROR] 提交失败: {e}")
