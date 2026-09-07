@@ -14,6 +14,13 @@ from datetime import datetime, timezone, timedelta
 import requests
 from seleniumbase import SB
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 # ---------- 配置 ----------
 BASE_URL   = "https://client.falixnodes.net"
 LOGIN_URL  = f"{BASE_URL}/auth/login"
@@ -336,7 +343,7 @@ def get_console_status(sb) -> str:
     # 优先从父级 #csb-status 的 class 判断（csb-online / csb-offline），
     # 不依赖动态 id(fx-...) 且自动规避中英文差异，统一返回英文状态。
     try:
-        elem = sb.find_element("#csb-status", timeout=5)
+        elem = sb.find_element("#csb-status, [class*='csb-status']", timeout=5)
         cls = (elem.get_attribute("class") or "").lower()
         if "online" in cls:
             return "online"
@@ -369,7 +376,10 @@ def fetch_servers_from_page(sb, email: str) -> Tuple[List[Dict], str]:
     last_shot = shot(sb, f"homepage-{email_safe}")
 
     try:
-        sb.wait_for_element_visible(".servers-container, .server-row-link", timeout=15)
+        sb.wait_for_element_visible(
+            ".servers-container, [class*='servers-container'], .server-row-link, [class*='server-row-link'], a[href*='/server/'], [data-server-id]",
+            timeout=15
+        )
         last_shot = shot(sb, f"servers-loaded-{email_safe}")
     except Exception:
         print("[ERROR] 服务器列表加载超时")
@@ -378,7 +388,7 @@ def fetch_servers_from_page(sb, email: str) -> Tuple[List[Dict], str]:
 
     servers = []
     try:
-        rows = sb.find_elements("a.server-row-link")
+        rows = sb.find_elements("a[class*='server-row-link'], a[href*='/server/']")
         print(f"[INFO] 发现 {len(rows)} 个服务器行")
         for idx, row in enumerate(rows):
             try:
@@ -386,8 +396,10 @@ def fetch_servers_from_page(sb, email: str) -> Tuple[List[Dict], str]:
                 if "/server/" not in href:
                     continue
                 server_id = href.split("/server/")[1].split("/")[0]
+                if any(s["id"] == server_id for s in servers):
+                    continue
                 name = f"Server-{server_id[:4]}"
-                for tag in ("h5", "h4", "span.server-name", ".server-title"):
+                for tag in ("h5", "h4", "span.server-name", "[class*='server-name']", ".server-title"):
                     try:
                         el = row.find_element("css selector", tag)
                         if el and el.text.strip():
@@ -395,7 +407,7 @@ def fetch_servers_from_page(sb, email: str) -> Tuple[List[Dict], str]:
                             break
                     except Exception:
                         pass
-                print(f"[INFO]  [{idx+1}] {name}")          # 日志中显示短ID
+                print(f"[INFO]  [{len(servers)+1}] {name} (ID: {server_id})")
                 servers.append({"id": server_id, "name": name})
             except Exception as e:
                 print(f"[WARN] 解析第 {idx+1} 行失败: {e}")
@@ -432,9 +444,9 @@ def check_and_restart_server(
 
         # 根据状态决定动作：在线 → 点“重启”；离线 → 点“启动”
         if status == "online":
-            action, action_en, btn_selector = "重启", "restart", ".console-btn.restart"
+            action, action_en, btn_selector = "重启", "restart", "[class*='console-btn'].restart, #restartbutton, .console-btn.restart"
         else:
-            action, action_en, btn_selector = "启动", "start", ".console-btn.start"
+            action, action_en, btn_selector = "启动", "start", "[class*='console-btn'].start, #startbutton, .console-btn.start"
 
         # 点击对应按钮（id 是动态的，一律用稳定的 class 定位）
         try:
